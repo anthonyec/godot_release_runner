@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://bbi6i4qkjkb1y"]
+[gd_scene load_steps=3 format=3 uid="uid://bbi6i4qkjkb1y"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_d2nyw"]
+[ext_resource type="Theme" uid="uid://bsr4tnftssevi" path="res://theme.tres" id="2_snppp"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -14,6 +15,7 @@ script = ExtResource("1_d2nyw")
 [node name="HTTPRequest" type="HTTPRequest" parent="."]
 
 [node name="Timer" type="Timer" parent="."]
+one_shot = true
 
 [node name="Panel" type="Panel" parent="."]
 layout_mode = 1
@@ -22,6 +24,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("2_snppp")
 
 [node name="MarginContainer" type="MarginContainer" parent="Panel"]
 layout_mode = 1
@@ -30,6 +33,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("2_snppp")
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
@@ -37,55 +41,90 @@ theme_override_constants/margin_bottom = 10
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer"]
 layout_mode = 2
+theme = ExtResource("2_snppp")
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+[node name="InputRow" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
 layout_mode = 2
+theme = ExtResource("2_snppp")
 
-[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer"]
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/InputRow"]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
+tooltip_text = "GitHub Username"
+mouse_filter = 0
+theme = ExtResource("2_snppp")
 text = "Username"
 
-[node name="UsernameLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer"]
+[node name="UsernameLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/InputRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme = ExtResource("2_snppp")
 
-[node name="HBoxContainer2" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+[node name="InputRow2" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
 layout_mode = 2
+theme = ExtResource("2_snppp")
 
-[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer2"]
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/InputRow2"]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
+tooltip_text = "GitHub Repo name"
+mouse_filter = 0
+theme = ExtResource("2_snppp")
 text = "Repo"
 
-[node name="RepoLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer2"]
+[node name="RepoLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/InputRow2"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme = ExtResource("2_snppp")
 
-[node name="HBoxContainer3" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+[node name="InputRow3" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
 layout_mode = 2
+theme = ExtResource("2_snppp")
 
-[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer3"]
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/InputRow3"]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
+tooltip_text = "GitHub Personal Access Token"
+mouse_filter = 0
+theme = ExtResource("2_snppp")
 text = "Token"
 
-[node name="TokenLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer3"]
+[node name="TokenLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/InputRow3"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme = ExtResource("2_snppp")
 select_all_on_focus = true
 secret = true
+
+[node name="InputRow4" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme = ExtResource("2_snppp")
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/InputRow4"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+tooltip_text = "Start when opening this application"
+mouse_filter = 0
+theme = ExtResource("2_snppp")
+text = "Autostart
+"
+
+[node name="AutostartCheckBox" type="CheckBox" parent="Panel/MarginContainer/VBoxContainer/InputRow4"]
+unique_name_in_owner = true
+layout_mode = 2
 
 [node name="StartStopButton" type="Button" parent="Panel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
+theme = ExtResource("2_snppp")
 text = "Start"
 
 [node name="LogTextEdit" type="TextEdit" parent="Panel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+theme = ExtResource("2_snppp")
 editable = false

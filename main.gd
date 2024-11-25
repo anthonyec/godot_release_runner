@@ -20,51 +20,71 @@ const CHECK_INTERVAL: float = 60 # seconds.
 @onready var token_line_edit: LineEdit = %TokenLineEdit
 @onready var log_text_edit: TextEdit = %LogTextEdit
 @onready var start_stop_button: Button = %StartStopButton
+@onready var autostart_check_box: CheckBox = %AutostartCheckBox
 
 var running_pid: int
 
 func _ready() -> void:
-	get_viewport().get_window().title = "Build Runner"
+	get_viewport().get_window().title = "Release Runner"
 	
 	timer.wait_time = CHECK_INTERVAL
-	timer.timeout.connect(ensure_latest_downloaded_and_running)
+	timer.timeout.connect(_on_timer_timeout)
 	
-	username_line_edit.text = get_value("username")
+	username_line_edit.text = get_value_string("username")
 	username_line_edit.text_changed.connect(_on_username_line_edit_text_changed)
 	
-	repo_line_edit.text = get_value("repo")
+	repo_line_edit.text = get_value_string("repo")
 	repo_line_edit.text_changed.connect(_on_repo_line_edit_text_changed)
 	
-	token_line_edit.text = get_value("token")
+	token_line_edit.text = get_value_string("token")
 	token_line_edit.text_changed.connect(_on_token_line_edit_text_changed)
 	
+	autostart_check_box.button_pressed = get_value_bool("autostart")
+	autostart_check_box.pressed.connect(_on_autostart_check_box_button_up)
+	
 	start_stop_button.pressed.connect(_on_start_stop_button_pressed)
+	
+	if get_value_bool("autostart"):
+		start()
 	
 func retry_after_timeout(status: String = "") -> void:
 	if not status.is_empty():
 		log_message(status)
 	
 	log_message("Waiting %s seconds to check again" % CHECK_INTERVAL)
+	
+	timer.paused = false
 	timer.start()
-	start_stop_button.text = "Stop"
 	
 func start() -> void:
 	if username_line_edit.text.is_empty() or repo_line_edit.text.is_empty() or token_line_edit.text.is_empty(): 
 		return log_message("Missing parameters")
-		
-	var url: String = "https://api.github.com/repos/%s/%s/releases/latest" % [username_line_edit.text, repo_line_edit.text]
 	
-	log_message("Started")
-	ensure_latest_downloaded_and_running(url, token_line_edit.text)
+	start_stop_button.text = "Stop"
+	
+	username_line_edit.editable = false
+	repo_line_edit.editable = false
+	token_line_edit.editable = false
+	autostart_check_box.disabled = true
+	
+	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text)
 
 func stop() -> void:
-	log_message("Stopped")
 	timer.stop()
+	
 	start_stop_button.text = "Start"
+	
+	username_line_edit.editable = true
+	repo_line_edit.editable = true
+	token_line_edit.editable = true
+	autostart_check_box.disabled = false
 
 	if running_pid != 0 and OS.is_process_running(running_pid):
 		OS.kill(running_pid)
-	
+		
+func get_url_from_inputs() -> String:
+	return "https://api.github.com/repos/%s/%s/releases/latest" % [username_line_edit.text, repo_line_edit.text]
+
 func has_downloaded_release(id: int) -> bool:
 	var directory: DirAccess = DirAccess.open("user://")
 	return directory.dir_exists(str(id))
@@ -147,6 +167,10 @@ func ensure_latest_downloaded_and_running(release_url: String, token: String) ->
 	
 	var latest_release_response: Dictionary = latest_release_result.to_dictionary()
 	
+	var latest_release_name: String = latest_release_response.get("name", "<No Title>")
+	var latest_release_created_at: String = latest_release_response.get("created_at", "<No Date>")
+	log_message("Latest release is: %s created at %s" % [latest_release_name, latest_release_created_at])
+	
 	var latest_release_id: int = latest_release_response.get("id", -1)
 	if latest_release_id == -1: return retry_after_timeout("Could not find ID in latest release: %s" % str(latest_release_response))
 	
@@ -211,14 +235,30 @@ func get_values() -> Dictionary:
 	if not json is Dictionary: return {}
 	
 	return json as Dictionary
-
-func get_value(key: String) -> String:
+	
+func get_value_variant(key: String) -> Variant:
 	var json: Dictionary = get_values()
-	if not json.has(key): return ""
+	if not json.has(key): return null
 	
 	return json[key]
+
+func get_value_string(key: String) -> String:
+	var value: Variant = get_value_variant(key)
 	
-func set_value(key: String, value: String) -> void:
+	if value is String:
+		return value
+		
+	return ""
+	
+func get_value_bool(key: String) -> bool:
+	var value: Variant = get_value_variant(key)
+	
+	if value is bool:
+		return value
+		
+	return false
+	
+func set_value_variant(key: String, value: Variant) -> void:
 	var json: Dictionary = get_values()
 	json[key] = value
 	
@@ -226,18 +266,32 @@ func set_value(key: String, value: String) -> void:
 	
 	file.store_string(JSON.stringify(json))
 	file.close()
+	
+func set_value_string(key: String, value: String) -> void:
+	set_value_variant(key, value)
+	
+func set_value_bool(key: String, value: bool) -> void:
+	set_value_variant(key, value)
 
 func _on_start_stop_button_pressed() -> void:
 	if timer.is_stopped():
+		log_message("Started")
 		return start()
 	
+	log_message("Stopped")
 	stop()
 
 func _on_username_line_edit_text_changed(new_text: String) -> void:
-	set_value("username", new_text)
+	set_value_string("username", new_text)
 	
 func _on_repo_line_edit_text_changed(new_text: String) -> void:
-	set_value("repo", new_text)
+	set_value_string("repo", new_text)
 	
 func _on_token_line_edit_text_changed(new_text: String) -> void:
-	set_value("token", new_text)
+	set_value_string("token", new_text)
+
+func _on_timer_timeout() -> void:
+	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text)
+
+func _on_autostart_check_box_button_up() -> void:
+	set_value_bool("autostart", autostart_check_box.button_pressed)
