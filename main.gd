@@ -81,7 +81,7 @@ func stop() -> void:
 
 	if running_pid != 0 and OS.is_process_running(running_pid):
 		OS.kill(running_pid)
-		
+
 func get_url_from_inputs() -> String:
 	return "https://api.github.com/repos/%s/%s/releases/latest" % [username_line_edit.text, repo_line_edit.text]
 
@@ -131,6 +131,8 @@ func download_and_extract_latest_release(latest_release_response: Dictionary) ->
 			
 			file.store_buffer(file_data)
 			file.close()
+			
+		directory.remove(zip_file_path)
 	
 	return ""
 
@@ -138,9 +140,9 @@ func run_downloaded_release(release_id: int) -> String:
 	var directory: DirAccess = DirAccess.open("user://%s" % str(release_id))
 	if not directory: return "Failed to open release directory"
 	
-	var files: PackedStringArray = directory.get_files()
-	
 	var executable_file_path: String = ""
+	
+	var files: PackedStringArray = directory.get_files()
 	
 	for file in files:
 		var os_name: String = OS.get_name().to_lower()
@@ -152,6 +154,10 @@ func run_downloaded_release(release_id: int) -> String:
 		if os_name == "macos" and file.ends_with(".app"):
 			executable_file_path = file
 			break
+			
+		if os_name == "linux" and file.ends_with(".x86_64"):
+			executable_file_path = file
+			break
 		
 	if executable_file_path.is_empty():
 		return "Failed to find executable"
@@ -161,7 +167,10 @@ func run_downloaded_release(release_id: int) -> String:
 
 func ensure_latest_downloaded_and_running(release_url: String, token: String) -> void:
 	log_message("Downloading latest release JSON")
-	var latest_release_result: RequestResult = await request(release_url, ["Accept: application/vnd.github+json", "Authorization: Bearer %s" % token])
+	var latest_release_result: RequestResult = await request(release_url, [
+		"Accept: application/vnd.github+json", 
+		"Authorization: Bearer %s" % token
+	])
 	if latest_release_result.result != 0: return retry_after_timeout("Failed latest release request with result code: %s" % latest_release_result.result)
 	if latest_release_result.response_code != 200: return retry_after_timeout("Failed latest release request with status code: %s" % latest_release_result.response_code)
 	
@@ -224,23 +233,22 @@ func log_message(message: String) -> void:
 	print(time, ": ", message)
 	log_text_edit.text += "[%s] %s \n" % [time, message]
 	log_text_edit.scroll_vertical = log_text_edit.text.length()
-	
-func get_values() -> Dictionary:
-	var file: FileAccess = FileAccess.open("user://settings.json", FileAccess.READ)
-	if not file: return {}
-	
-	var text: String = file.get_as_text()
-	
-	var json: Variant = JSON.parse_string("{}" if text.is_empty() else text)
-	if not json is Dictionary: return {}
-	
-	return json as Dictionary
-	
+
 func get_value_variant(key: String) -> Variant:
-	var json: Dictionary = get_values()
-	if not json.has(key): return null
+	var config: ConfigFile = ConfigFile.new()
+	config.load("user://config.cfg")
 	
-	return json[key]
+	if not config.has_section_key("settings", key):
+		return null
+	
+	return config.get_value("settings", key, null)
+	
+func set_value_variant(key: String, value: Variant) -> void:
+	var config: ConfigFile = ConfigFile.new()
+	config.load("user://config.cfg")
+	
+	config.set_value("settings", key, value)
+	config.save("user://config.cfg")
 
 func get_value_string(key: String) -> String:
 	var value: Variant = get_value_variant(key)
@@ -249,7 +257,10 @@ func get_value_string(key: String) -> String:
 		return value
 		
 	return ""
-	
+
+func set_value_string(key: String, value: String) -> void:
+	set_value_variant(key, value)
+
 func get_value_bool(key: String) -> bool:
 	var value: Variant = get_value_variant(key)
 	
@@ -257,19 +268,7 @@ func get_value_bool(key: String) -> bool:
 		return value
 		
 	return false
-	
-func set_value_variant(key: String, value: Variant) -> void:
-	var json: Dictionary = get_values()
-	json[key] = value
-	
-	var file: FileAccess = FileAccess.open("user://settings.json", FileAccess.WRITE)
-	
-	file.store_string(JSON.stringify(json))
-	file.close()
-	
-func set_value_string(key: String, value: String) -> void:
-	set_value_variant(key, value)
-	
+
 func set_value_bool(key: String, value: bool) -> void:
 	set_value_variant(key, value)
 
