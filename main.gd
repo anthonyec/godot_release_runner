@@ -27,6 +27,7 @@ const RELEASES_PATH: String = "user://releases"
 @onready var token_line_edit: LineEdit = %TokenLineEdit
 @onready var log_text_edit: TextEdit = %LogTextEdit
 @onready var release_option_button: OptionButton = %ReleaseOptionButton
+@onready var filter_line_edit: LineEdit = %FilterLineEdit
 @onready var start_stop_button: Button = %StartStopButton
 @onready var autostart_check_box: CheckBox = %AutostartCheckBox
 
@@ -48,6 +49,9 @@ func _ready() -> void:
 	token_line_edit.text_changed.connect(_on_token_line_edit_text_changed)
 
 	release_option_button.item_selected.connect(_on_release_option_button_item_selected)
+	
+	filter_line_edit.text = get_value_string("filter")
+	filter_line_edit.text_changed.connect(_on_filter_line_edit_text_changed)
 
 	autostart_check_box.button_pressed = get_value_bool("autostart")
 	autostart_check_box.pressed.connect(_on_autostart_check_box_button_up)
@@ -88,9 +92,10 @@ func start() -> void:
 	username_line_edit.editable = false
 	repo_line_edit.editable = false
 	token_line_edit.editable = false
+	filter_line_edit.editable = false
 	autostart_check_box.disabled = true
 
-	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text)
+	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text, get_filter_from_inputs())
 
 func stop() -> void:
 	timer.stop()
@@ -100,6 +105,7 @@ func stop() -> void:
 	username_line_edit.editable = true
 	repo_line_edit.editable = true
 	token_line_edit.editable = true
+	filter_line_edit.editable = true
 	autostart_check_box.disabled = false
 
 	if running_pid != 0 and OS.is_process_running(running_pid):
@@ -112,6 +118,15 @@ func get_url_from_inputs() -> String:
 		return "https://api.github.com/repos/%s/%s/releases/tags/%s" % [username_line_edit.text, repo_line_edit.text, selected_tag_name]
 
 	return "https://api.github.com/repos/%s/%s/releases/latest" % [username_line_edit.text, repo_line_edit.text]
+	
+func get_filter_from_inputs() -> PackedStringArray:
+	var filter: PackedStringArray = filter_line_edit.text.split(",", false)
+	
+	for index in filter.size():
+		var string: String = filter[index]
+		filter[index] = string.strip_edges()
+		
+	return filter
 
 func update_release_tag_names() -> void:
 	var releases_url: String = "https://api.github.com/repos/%s/%s/releases" % [username_line_edit.text, repo_line_edit.text]
@@ -171,8 +186,15 @@ func extract_zip(source_path: String, output_path: String, depth: int = 0) -> St
 		if result != 0: return "Failed to extract on %s with exit code %s:\n%s" % [os_name, result, "".join(PackedStringArray(output))]
 
 	return ""
+	
+func is_filename_allowed(filename: String, filter: PackedStringArray) -> bool:
+	for string in filter:
+		if not filename.contains(string):
+			return false
+			
+	return true
 
-func download_and_extract_latest_release(latest_release_response: Dictionary, token: String) -> String:
+func download_and_extract_latest_release(latest_release_response: Dictionary, token: String, filter: PackedStringArray = []) -> String:
 	var release_id: int = latest_release_response.get("id", -1) as int
 	if release_id == -1: return "Could not find `id` in release info response: %s" % str(latest_release_response)
 
@@ -190,7 +212,11 @@ func download_and_extract_latest_release(latest_release_response: Dictionary, to
 
 		var asset_name: String = asset.get("name", "") as String
 		if not asset_name.ends_with(".zip"): continue
-
+		
+		if not is_filename_allowed(asset_name, filter):
+			continue
+		
+		log_message("Downloading %s" % asset_name)
 		var download_result: RequestResult = await request(asset_url, ["Accept: application/octet-stream", "Authorization: Bearer %s" % token])
 		if download_result.response_code != 200: return "Failed to download with response code: %s" % download_result.response_code
 
@@ -233,7 +259,7 @@ func run_downloaded_release(release_id: int) -> String:
 	running_pid = OS.create_process(ProjectSettings.globalize_path(executable_file_path), [], false)
 	return ""
 
-func ensure_latest_downloaded_and_running(release_url: String, token: String) -> void:
+func ensure_latest_downloaded_and_running(release_url: String, token: String, filter: PackedStringArray = []) -> void:
 	log_message("Getting latest release info")
 	var latest_release_result: RequestResult = await request(release_url, [
 		"Accept: application/vnd.github+json", 
@@ -256,7 +282,7 @@ func ensure_latest_downloaded_and_running(release_url: String, token: String) ->
 
 	if is_new_release:
 		log_message("It hasn't, downloading and extracting it...")
-		var status: String = await download_and_extract_latest_release(latest_release_response, token)
+		var status: String = await download_and_extract_latest_release(latest_release_response, token, filter)
 		if not status.is_empty(): return retry_after_timeout("Failed to download release: %s" % status)
 	else:
 		log_message("Release %s has already been downloaded" % str(latest_release_id))
@@ -363,10 +389,13 @@ func _on_token_line_edit_text_changed(new_text: String) -> void:
 	set_value_string("token", new_text)
 
 func _on_timer_timeout() -> void:
-	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text)
+	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text, get_filter_from_inputs())
 
 func _on_autostart_check_box_button_up() -> void:
 	set_value_bool("autostart", autostart_check_box.button_pressed)
 
 func _on_release_option_button_item_selected(index: int) -> void:
 	set_value_string("tag", release_option_button.get_item_text(index))
+
+func _on_filter_line_edit_text_changed(new_text: String) -> void:
+	set_value_string("filter", new_text)

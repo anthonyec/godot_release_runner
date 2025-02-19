@@ -107,7 +107,7 @@ theme = ExtResource("2")
 [node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/InputRow5"]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
-tooltip_text = "GitHub Personal Access Token"
+tooltip_text = "GitHub tag"
 mouse_filter = 0
 theme = ExtResource("2")
 text = "Tag"
@@ -119,6 +119,25 @@ size_flags_horizontal = 3
 selected = 0
 item_count = 1
 popup/item_0/text = "Latest"
+
+[node name="InputRow6" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme = ExtResource("2")
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/InputRow6"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+tooltip_text = "Comma seperated list of words that must be in the filename for the file to be download. 
+Case insenstive, leave blank to download all files."
+mouse_filter = 0
+theme = ExtResource("2")
+text = "Filter"
+
+[node name="FilterLineEdit" type="LineEdit" parent="Panel/MarginContainer/VBoxContainer/InputRow6"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme = ExtResource("2")
 
 [node name="InputRow4" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
 layout_mode = 2
