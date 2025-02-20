@@ -30,6 +30,7 @@ const RELEASES_PATH: String = "user://releases"
 @onready var filter_line_edit: LineEdit = %FilterLineEdit
 @onready var start_stop_button: Button = %StartStopButton
 @onready var autostart_check_box: CheckBox = %AutostartCheckBox
+@onready var prerelease_check_box: CheckBox = %PrereleaseCheckBox
 
 var running_pid: int
 
@@ -50,6 +51,9 @@ func _ready() -> void:
 
 	release_option_button.item_selected.connect(_on_release_option_button_item_selected)
 	
+	prerelease_check_box.button_pressed = get_value_bool("prerelease")
+	prerelease_check_box.pressed.connect(_on_prerelease_check_box_button_up)
+	
 	filter_line_edit.text = get_value_string("filter")
 	filter_line_edit.text_changed.connect(_on_filter_line_edit_text_changed)
 
@@ -58,7 +62,7 @@ func _ready() -> void:
 
 	start_stop_button.pressed.connect(_on_start_stop_button_pressed)
 
-	await update_release_tag_names()
+	await update_release_names()
 
 	if get_value_bool("autostart"):
 		start()
@@ -81,7 +85,7 @@ func retry_after_timeout(status: String = "") -> void:
 	timer.paused = false
 	timer.start()
 
-	update_release_tag_names()
+	update_release_names()
 
 func start() -> void:
 	if username_line_edit.text.is_empty() or repo_line_edit.text.is_empty() or token_line_edit.text.is_empty():
@@ -95,7 +99,7 @@ func start() -> void:
 	filter_line_edit.editable = false
 	autostart_check_box.disabled = true
 
-	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text, get_filter_from_inputs())
+	ensure_latest_downloaded_and_running(await get_url_from_inputs(), token_line_edit.text, get_filter_from_inputs())
 
 func stop() -> void:
 	timer.stop()
@@ -117,7 +121,14 @@ func get_url_from_inputs() -> String:
 	if selected_tag_name != "Latest":
 		return "https://api.github.com/repos/%s/%s/releases/tags/%s" % [username_line_edit.text, repo_line_edit.text, selected_tag_name]
 
-	return "https://api.github.com/repos/%s/%s/releases/latest" % [username_line_edit.text, repo_line_edit.text]
+	var sorted_releases: Array = await get_sorted_releases(get_value_bool("prerelease"))
+	if sorted_releases.is_empty(): return ""
+	
+	var latest_release: Dictionary = sorted_releases[0]
+	var latest_tag_name: String = latest_release.get("tag_name", "")
+	if not latest_tag_name: return ""
+	
+	return "https://api.github.com/repos/%s/%s/releases/tags/%s" % [username_line_edit.text, repo_line_edit.text, latest_tag_name]
 	
 func get_filter_from_inputs() -> PackedStringArray:
 	var filter: PackedStringArray = filter_line_edit.text.split(",", false)
@@ -128,22 +139,44 @@ func get_filter_from_inputs() -> PackedStringArray:
 		
 	return filter
 
-func update_release_tag_names() -> void:
-	var releases_url: String = "https://api.github.com/repos/%s/%s/releases" % [username_line_edit.text, repo_line_edit.text]
+func get_sorted_releases(use_prereleases: bool) -> Array:
+	var releases_url: String = "https://api.github.com/repos/%s/%s/releases?per_page=100" % [username_line_edit.text, repo_line_edit.text]
 
 	var release_result: RequestResult = await request(releases_url, ["Accept: application/vnd.github+json", "Authorization: Bearer %s" % get_value_string("token")])
-	if release_result.result != 0: return
-	if release_result.response_code != 200: return
+	if release_result.result != 0: return []
+	if release_result.response_code != 200: return []
+	
+	var sorted_releases: Array = release_result.to_array()
+	sorted_releases.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var time_a: int = Time.get_unix_time_from_datetime_string(a.get("created_at", ""))
+		var time_b: int = Time.get_unix_time_from_datetime_string(b.get("created_at", ""))
+		
+		return time_a > time_b
+	)
+	
+	var releases: Array = []
+	
+	for release: Dictionary in sorted_releases:
+		var is_prerelease: bool = release.get("prerelease", false)
+		if use_prereleases != is_prerelease: continue
+		
+		releases.append(release)
+	
+	return releases
 
+func update_release_names() -> void:
+	release_option_button.disabled = true
+	
 	var selected_tag_name: String = get_value_string("tag")
+	var sorted_releases: Array = await get_sorted_releases(get_value_bool("prerelease"))
 
 	release_option_button.clear()
 	release_option_button.add_item("Latest")
 
-	for release: Dictionary in release_result.to_array():
+	for release: Dictionary in sorted_releases:
 		var tag_name: String = release.get("tag_name", "")
 		if tag_name.is_empty(): continue
-
+		
 		release_option_button.add_item(tag_name)
 
 	for index in release_option_button.item_count:
@@ -151,6 +184,8 @@ func update_release_tag_names() -> void:
 
 		if tag_name == selected_tag_name:
 			release_option_button.selected = index
+			
+	release_option_button.disabled = false
 
 func has_downloaded_release(id: int) -> bool:
 	var directory: DirAccess = DirAccess.open(RELEASES_PATH)
@@ -374,7 +409,8 @@ func set_value_bool(key: String, value: bool) -> void:
 func _on_start_stop_button_pressed() -> void:
 	if timer.is_stopped():
 			log_message("Started")
-			return start()
+			start()
+			return
 
 	log_message("Stopped")
 	stop()
@@ -389,7 +425,7 @@ func _on_token_line_edit_text_changed(new_text: String) -> void:
 	set_value_string("token", new_text)
 
 func _on_timer_timeout() -> void:
-	ensure_latest_downloaded_and_running(get_url_from_inputs(), token_line_edit.text, get_filter_from_inputs())
+	ensure_latest_downloaded_and_running(await get_url_from_inputs(), token_line_edit.text, get_filter_from_inputs())
 
 func _on_autostart_check_box_button_up() -> void:
 	set_value_bool("autostart", autostart_check_box.button_pressed)
@@ -399,3 +435,7 @@ func _on_release_option_button_item_selected(index: int) -> void:
 
 func _on_filter_line_edit_text_changed(new_text: String) -> void:
 	set_value_string("filter", new_text)
+
+func _on_prerelease_check_box_button_up() -> void:
+	set_value_bool("prerelease", prerelease_check_box.button_pressed)
+	await update_release_names()

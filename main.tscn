@@ -120,6 +120,11 @@ selected = 0
 item_count = 1
 popup/item_0/text = "Latest"
 
+[node name="PrereleaseCheckBox" type="CheckBox" parent="Panel/MarginContainer/VBoxContainer/InputRow5"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pre-release"
+
 [node name="InputRow6" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 theme = ExtResource("2")
